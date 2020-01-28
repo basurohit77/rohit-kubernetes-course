@@ -1,9 +1,11 @@
-# istio
+ istio
 
 ## Kops configuration
 ```
-kops edit cluster kubernetes.newtech.academy
-```
+kops get cluster --state=s3://kops-state-8485
+kops edit cluster kubernetes.rohitnewtech.asia --state=s3://kops-state-8485
+
+
 Add:
 ```
   kubeAPIServer:
@@ -24,10 +26,14 @@ Add:
 ## download (1.0.3):
 ```
 cd ~
-wget https://github.com/istio/istio/releases/download/1.0.3/istio-1.0.3-linux.tar.gz
-tar -xzvf istio-1.0.3-linux.tar.gz
-cd istio-1.0.3
-echo 'export PATH="$PATH:/home/ubuntu/istio-1.0.3/bin"' >> ~/.profile
+wget https://github.com/istio/istio/releases/download/1.4.3/istio-1.4.3-linux.tar.gz
+tar -zxvf istio-1.4.3-linux.tar.gz 
+chmod +x istio-1.4.3
+cd istio-1.4.3
+
+echo "export PATH=$PATH:$HOME/.local/bin:$HOME/bin:$HOME/istio-1.4.3/bin" >> ~/.bash_profile 
+export PATH=$PATH:$HOME/.local/bin:$HOME/bin:$HOME/istio-1.4.3/bin
+
 ```
 
 ## Download (latest):
