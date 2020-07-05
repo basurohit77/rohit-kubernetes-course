@@ -1,0 +1,281 @@
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ServiceRole
+metadata:
+  name: hello-viewer-sr
+  namespace: istiodemo #default
+spec:
+  rules:
+  - services: ["hello.istiodemo.svc.cluster.local"]
+    methods: ["GET", "HEAD"]
+---
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ServiceRole
+metadata:
+  name: world-viewer-sr
+  namespace: istiodemo #default
+spec:
+  rules:
+  - services: ["world.istiodemo.svc.cluster.local"]
+    methods: ["GET", "HEAD"]
+---
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ServiceRole
+metadata:
+  name: world-2-viewer-sr
+  namespace: istiodemo #default
+spec:
+  rules:
+  - services: ["world-2.istiodemo.svc.cluster.local"]
+    methods: ["GET", "HEAD"]
+---
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ServiceRoleBinding
+metadata:
+  name: istio-ingress-binding
+  namespace: istiodemo #default
+spec:
+  subjects:
+  - properties:
+      source.namespace: "istio-system"
+  roleRef:
+    kind: ServiceRole
+    name: "hello-viewer-sr"
+---
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ServiceRoleBinding
+metadata:
+  name: hello-user-binding
+  namespace: istiodemo #default
+spec:
+  subjects:
+  - user: "cluster.local/ns/istiodemo/sa/hello-sa"  #/namespaces/istiodemo/serviceaccounts/hello-sa /ns/istiodemo/sa/hello-sa
+  roleRef:
+    kind: ServiceRole
+    name: "world-viewer-sr"
+---
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ServiceRoleBinding
+metadata:
+  name: world-user-binding
+  namespace: istiodemo #default
+spec:
+  subjects:
+  - user: "cluster.local/ns/istiodemo/sa/world-sa"  #/namespaces/istiodemo/serviceaccounts/world-sa  /ns/istiodemo/sa/world-sa
+  roleRef:
+    kind: ServiceRole
+    name: "world-2-viewer-sr"
+---
+### 
+### Kubernetes Service accounts
+###
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hello-sa
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: world-sa
+---
+### 
+### helloworld.yaml deployments, including a serviceaccount
+### for the hello deployment and the world deployment
+###
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello
+  template:
+    metadata:
+      labels:
+        app: hello
+        version: v1
+      annotations:
+        sidecar.istio.io/inject: 'true'
+    spec:
+      serviceAccountName: hello-sa  # service account
+      containers:
+      - name: hello
+        image: wardviaene/http-echo
+        env:
+        - name: TEXT
+          value: hello
+        - name: NEXT
+          value: "world:8080"
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          privileged: true
+        ports:
+        - name: http
+          containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello
+  labels:
+    app: hello
+spec:
+  selector:
+    app: hello
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: world
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: world
+  template:
+    metadata:
+      labels:
+        app: world
+        version: v1
+      annotations:
+        sidecar.istio.io/inject: 'true'
+    spec:
+      serviceAccountName: world-sa  # service account
+      containers:
+      - name: world
+        image: wardviaene/http-echo
+        env:
+        - name: TEXT
+          value: world
+        - name: NEXT
+          value: "world-2:8080"
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          privileged: true
+        ports:
+        - name: http
+          containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: world
+  labels:
+    app: world
+spec:
+  selector:
+    app: world
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: world-2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: world-2
+  template:
+    metadata:
+      labels:
+        app: world-2
+        version: v1
+      annotations:
+        sidecar.istio.io/inject: 'true'
+    spec:
+      containers:
+      - name: world-2
+        image: wardviaene/http-echo
+        env:
+        - name: TEXT
+          value: "!!!" 
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          privileged: true
+
+        ports:
+        - name: http
+          containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: world-2
+  labels:
+    app: world-2
+spec:
+  selector:
+    app: world-2
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: helloworld-gateway
+spec:
+  selector:
+    istio: ingressgateway # use istio default controller
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule 
+metadata:        
+  name: helloworld-dr    
+spec:            
+  host: hello.istiodemo.svc.cluster.local
+  # uncomment to enable mutual TLS
+  trafficPolicy:
+    tls:         
+      mode: ISTIO_MUTUAL
+  subsets:       
+  - name: v1     
+    labels:      
+      version: v1
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: helloworld-vs
+spec:
+  hosts:
+  - "*" #- "hello-rbac.example.com"
+  gateways:
+  - helloworld-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /hellorohit
+    route:
+    - destination:
+        host: hello.istiodemo.svc.cluster.local
+        subset: v1
+        port:
+          number: 8080

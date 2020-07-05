@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: hello
 spec:
-  replicas: 3
+  replicas: 2
   selector:
     matchLabels:
       app: hello
@@ -44,7 +44,7 @@ kind: Deployment
 metadata:
   name: world
 spec:
-  replicas: 3
+  replicas: 2
   selector:
     matchLabels:
       app: world
@@ -85,7 +85,7 @@ kind: Deployment
 metadata:
   name: world-2
 spec:
-  replicas: 3
+  replicas: 2
   selector:
     matchLabels:
       app: world-2
