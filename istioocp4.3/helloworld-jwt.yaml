@@ -13,38 +13,6 @@ spec:
     hosts:
     - "*"
 ---
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: helloworld-auth
-spec:
-  hosts:
-  - "auth.kubernetes.newtech.academy"
-  gateways:
-  - helloworld-gateway
-  http:
-  - route:
-    - destination:
-        host: auth.default.svc.cluster.local
-        port:
-          number: 8080
----
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: helloworld-hello
-spec:
-  hosts:
-  - "hello.kubernetes.newtech.academy"
-  gateways:
-  - helloworld-gateway
-  http:
-  - route:
-    - destination:
-        host: hello.default.svc.cluster.local
-        port:
-          number: 8080
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -59,6 +27,8 @@ spec:
       labels:
         app: auth
         version: v1
+      annotations:
+        sidecar.istio.io/inject: 'true'
     spec:
       containers:
       - name: auth
@@ -66,6 +36,12 @@ spec:
         env:
         - name: TEXT
           value: this is the authentication service
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          privileged: true
         ports:
         - name: http
           containerPort: 8080
@@ -98,6 +74,8 @@ spec:
       labels:
         app: hello
         version: v1
+      annotations:
+        sidecar.istio.io/inject: 'true'
     spec:
       containers:
       - name: hello
@@ -105,6 +83,12 @@ spec:
         env:
         - name: TEXT
           value: Hello, you can only reach this service when authenticated
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          privileged: true
         ports:
         - name: http
           containerPort: 8080
@@ -122,24 +106,50 @@ spec:
   - name: http
     port: 8080
     targetPort: 8080
-###
-### Enable TLS
-###
 ---
-apiVersion: authentication.istio.io/v1alpha1
-kind: "MeshPolicy"
-metadata:
-  name: "default"
-spec:
-  peers:
-  - mtls: {}
+#apiVersion: "rbac.istio.io/v1alpha1"
+#kind: RbacConfig
+#metadata:
+#  name: default
+#spec:
+#  mode: 'ON_WITH_INCLUSION'
+#  inclusion:
+#    #namespaces: ["default"]
+#    namespaces: ["default"]
+#---
+###
+#### Enable TLS
+####
+#apiVersion: authentication.istio.io/v1alpha1
+#kind: "MeshPolicy"
+#metadata:
+#  name: "default"
+#spec:
+#  peers:
+#  - mtls: {}
 ---
+#apiVersion: networking.istio.io/v1alpha3
+#kind: DestinationRule
+#metadata:
+#  name: helloworld-dr
+#spec:
+#  host: hello.default.svc.cluster.local
+#  # uncomment to enable mutual TLS
+#  trafficPolicy:
+#    tls:
+#      mode: ISTIO_MUTUAL
+#  subsets:
+#  - name: v1
+#    labels:
+#      version: v1
+#---
 apiVersion: networking.istio.io/v1alpha3
 kind: DestinationRule
 metadata:
-  name: "enable-mtls"
+  name: "enable-mtls-dr"
   namespace: "default" # even though we specify a namespace, this rule applies to all namespaces
 spec:
+  exportTo: []
   host: "*.local"
   trafficPolicy:
     tls:
@@ -148,9 +158,46 @@ spec:
 apiVersion: networking.istio.io/v1alpha3
 kind: DestinationRule
 metadata:
- name: "api-server"
+ name: "api-serve-dr"
 spec:
  host: "kubernetes.default.svc.cluster.local"
  trafficPolicy:
    tls:
      mode: DISABLE
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: helloworld-hello
+spec:    
+  hosts: 
+  - "*" #- "hello.kubernetes.newtech.academy" #istio-ingressgateway-istio-system.container-crush-01-4044f3a4e314f4bcb433696c70d13be9-0000.che01.containers.appdomain.cloud
+  gateways:
+  - helloworld-gateway
+  http:  
+  - match:
+    - uri:
+        prefix: /hellobasu
+    route:
+    - destination:
+        host: hello.default.svc.cluster.local
+        #subset: v1
+        port:
+          number: 8080
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: helloworld-auth
+spec:
+  hosts:
+  - "*" #- "auth.kubernetes.newtech.academy" #istio-ingressgateway-istio-system.container-crush-01-4044f3a4e314f4bcb433696c70d13be9-0000.che01.containers.appdomain.cloud
+  gateways:
+  - helloworld-gateway
+  http:
+  - route:
+    - destination:
+        host: auth.default.svc.cluster.local
+        port:
+          number: 8080
+

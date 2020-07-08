@@ -1,0 +1,17 @@
+apiVersion: "authentication.istio.io/v1alpha1"
+kind: "Policy"
+metadata:
+  name: "jwtpolicy-example"
+spec:
+  targets:
+  - name: hello
+  peers:
+  - mtls: {}
+  origins:
+  - jwt:
+      issuer: "http-echo@http-echo.kubernetes.newtech.academy"
+      jwksUri: "https://istio-ingressgateway-istio-system.container-crush-01-4044f3a4e314f4bcb433696c70d13be9-0000.che01.containers.appdomain.cloud/.well-known/jwks.json" 
+               #http://auth.kubernetes.newtech.academy/.well-known/jwks.json"  
+               #https://istio-ingressgateway-istio-system.container-crush-01-4044f3a4e314f4bcb433696c70d13be9-0000.che01.containers.appdomain.cloud
+  principalBinding: USE_ORIGIN
+---

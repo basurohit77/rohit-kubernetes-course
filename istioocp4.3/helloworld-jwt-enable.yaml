@@ -10,6 +10,6 @@ spec:
   origins:
   - jwt:
       issuer: "http-echo@http-echo.kubernetes.newtech.academy"
-      jwksUri: "http://auth.kubernetes.newtech.academy/.well-known/jwks.json"
+      jwksUri: "http://auth.kubernetes.newtech.academy/.well-known/jwks.json"  
   principalBinding: USE_ORIGIN
 ---
