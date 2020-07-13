@@ -1,150 +1,3 @@
-####Added by Rohit for service role of ingressgateway istio-ingressgateway
-apiVersion: "rbac.istio.io/v1alpha1"
-kind: ServiceRole
-metadata:
-  name: ingress-viewer-sr
-  namespace: istiodemo #default
-spec:
-  rules:
-  - services: ["istio-ingressgateway.istio-system.svc.cluster.local"]
-    methods: ["GET", "HEAD"]
----
-apiVersion: "rbac.istio.io/v1alpha1"
-kind: ServiceRole
-metadata:
-  name: hello-viewer-sr
-  namespace: istiodemo #default
-spec:
-  rules:
-  - services: ["hello.istiodemo.svc.cluster.local"]
-    methods: ["GET", "HEAD"]
----
-#####Add by Rohit for JWT
-apiVersion: "rbac.istio.io/v1alpha1"
-kind: ServiceRole
-metadata:    
-  name: auth-viewer-sr
-  namespace: istiodemo #default
-spec:        
-  rules:     
-  - services: ["auth.istiodemo.svc.cluster.local"]
-    methods: ["GET", "HEAD"]
----
-apiVersion: "rbac.istio.io/v1alpha1"
-kind: ServiceRole
-metadata:
-  name: world-viewer-sr
-  namespace: istiodemo #default
-spec:
-  rules:
-  - services: ["world.istiodemo.svc.cluster.local"]
-    methods: ["GET", "HEAD"]
----
-apiVersion: "rbac.istio.io/v1alpha1"
-kind: ServiceRole
-metadata:
-  name: world-2-viewer-sr
-  namespace: istiodemo #default
-spec:
-  rules:
-  - services: ["world-2.istiodemo.svc.cluster.local"]
-    methods: ["GET", "HEAD"]
----
-apiVersion: "rbac.istio.io/v1alpha1"
-kind: ServiceRoleBinding
-metadata:
-  name: istio-ingress-binding
-  namespace: istiodemo #default
-spec:
-  subjects:
-  - properties:
-      source.namespace: "istio-system"
-  roleRef:
-    kind: ServiceRole
-    name: "hello-viewer-sr"
----
-#####Add by Rohit for JWT, ingress to auth for token request
-apiVersion: "rbac.istio.io/v1alpha1"
-kind: ServiceRoleBinding
-metadata:             
-  name: istio-ingressauth-binding
-  namespace: istiodemo #default
-spec:                 
-  subjects:           
-  - properties:       
-      source.namespace: "istio-system"
-  roleRef:            
-    kind: ServiceRole
-    name: "auth-viewer-sr"
----
-apiVersion: "rbac.istio.io/v1alpha1"
-kind: ServiceRoleBinding
-metadata:
-  name: hello-user-binding
-  namespace: istiodemo #default
-spec:
-  subjects:
-  - user: "cluster.local/ns/istiodemo/sa/hello-sa"  #create hello-sa and attached that service account to hello deployment
-  roleRef:
-    kind: ServiceRole
-    name: "world-viewer-sr"
----
-#####Add by Rohit for JWT, hello to auth for public key
-apiVersion: "rbac.istio.io/v1alpha1"
-kind: ServiceRoleBinding
-metadata:   
-  name: hello-auth-binding
-  namespace: istiodemo #default
-spec:       
-  subjects:
-  - user: "cluster.local/ns/istiodemo/sa/hello-sa"  #create hello-sa and attached that service account to hello deployment
-  roleRef:
-    kind: ServiceRole
-    name: "auth-viewer-sr"
----
-#####Added by Rohit for auth to ingress binding
-apiVersion: "rbac.istio.io/v1alpha1"
-kind: ServiceRoleBinding
-metadata:
-  name: auth-ingress-binding
-  namespace: istiodemo #default
-spec:
-  subjects:
-  - user: "cluster.local/ns/istiodemo/sa/auth-sa"  #create hello-sa and attached that service account to hello deployment
-  roleRef:
-    kind: ServiceRole
-    name: "ingress-viewer-sr"
----
-apiVersion: "rbac.istio.io/v1alpha1"
-kind: ServiceRoleBinding
-metadata:
-  name: world-user-binding
-  namespace: istiodemo #default
-spec:
-  subjects:
-  - user: "cluster.local/ns/istiodemo/sa/world-sa"  #create world-sa and attached that service account to world deployment
-  roleRef:
-    kind: ServiceRole
-    name: "world-2-viewer-sr"
----
-### 
-### Kubernetes Service accounts
-###
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: hello-sa
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: world-sa
----
-apiVersion: v1    
-kind: ServiceAccount
-metadata:         
-  name: auth-sa  
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -162,7 +15,6 @@ spec:
       annotations:
         sidecar.istio.io/inject: 'true'
     spec:
-      serviceAccountName: auth-sa  # service account
       containers:
       - name: auth
         image: wardviaene/http-echo
@@ -214,13 +66,12 @@ spec:
       annotations:
         sidecar.istio.io/inject: 'true'
     spec:
-      serviceAccountName: hello-sa  # service account
       containers:
       - name: hello
         image: wardviaene/http-echo
         env:
         - name: TEXT
-          value: hello rbac
+          value: hello jwt application service needs authentication
         - name: NEXT
           value: "world:8080"
         resources:
@@ -264,7 +115,6 @@ spec:
       annotations:
         sidecar.istio.io/inject: 'true'
     spec:
-      serviceAccountName: world-sa  # service account
       containers:
       - name: world
         image: wardviaene/http-echo
@@ -326,7 +176,6 @@ spec:
             memory: 128Mi
         securityContext:
           privileged: true
-
         ports:
         - name: http
           containerPort: 8080
@@ -360,28 +209,6 @@ spec:
     hosts:
     - "*"
 ---
-####Added by Rohit for RBAC
-apiVersion: "rbac.istio.io/v1alpha1"
-kind: RbacConfig
-metadata:
-  name: default
-spec:
-  mode: 'ON_WITH_INCLUSION'
-  inclusion:
-    #namespaces: ["default"]
-    namespaces: ["istiodemo"]
----
-###
-##### Enable TLS
-#####
-##apiVersion: authentication.istio.io/v1alpha1
-##kind: "MeshPolicy"
-##metadata:
-##  name: "default"
-##spec:
-##  peers:
-##  - mtls: {}
-#---
 apiVersion: networking.istio.io/v1alpha3
 kind: DestinationRule
 metadata:
@@ -404,21 +231,21 @@ spec:
     tls:
       mode: DISABLE
 ---
-apiVersion: networking.istio.io/v1alpha3
-kind: DestinationRule 
-metadata:        
-  name: helloworld-dr    
-spec:            
-  host: hello.istiodemo.svc.cluster.local
-  # uncomment to enable mutual TLS
-  trafficPolicy:
-    tls:         
-      mode: ISTIO_MUTUAL
-  subsets:       
-  - name: v1     
-    labels:      
-      version: v1
----
+#apiVersion: networking.istio.io/v1alpha3
+#kind: DestinationRule 
+#metadata:        
+#  name: helloworld-dr    
+#spec:            
+#  host: hello.istiodemo.svc.cluster.local
+#  # uncomment to enable mutual TLS
+#  trafficPolicy:
+#    tls:         
+#      mode: ISTIO_MUTUAL
+#  subsets:       
+#  - name: v1     
+#    labels:      
+#      version: v1
+#---
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
@@ -435,7 +262,7 @@ spec:
     route:
     - destination:
         host: hello.istiodemo.svc.cluster.local
-        subset: v1
+        #subset: v1
         port:
           number: 8080
 ---
@@ -445,7 +272,7 @@ metadata:
   name: helloauth-vs
 spec:
   hosts:
-  - "*"  #- "auth.kubernetes.newtect.academy"
+  - "*"  #- "istio-ingressgateway-istio-system.container-crush-01-4044f3a4e314f4bcb433696c70d13be9-0000.che01.containers.appdomain.cloud" #- "auth.kubernetes.newtect.academy"
   gateways:
   - helloworld-gateway
   http:
